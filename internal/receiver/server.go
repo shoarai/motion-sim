@@ -18,6 +18,7 @@ type Motion struct {
 }
 
 type MotionReceiver struct {
+	connection   net.PacketConn
 	motionString string
 	mutex        *sync.Mutex
 }
@@ -25,6 +26,10 @@ type MotionReceiver struct {
 func (m *MotionReceiver) Listen(address string, done chan struct{}) (error, chan error) {
 	m.motionString = "0,0,0,0,0,0"
 	return m.receive(address, done)
+}
+
+func (m *MotionReceiver) Close() {
+	m.connection.Close()
 }
 
 func (m *MotionReceiver) GetMotion() *Motion {
@@ -64,7 +69,8 @@ func toMotion(str string) *Motion {
 
 func (m *MotionReceiver) receive(address string, done chan struct{}) (error, chan error) {
 	fmt.Println("Server is Running at " + address)
-	conn, err := net.ListenPacket("udp", address)
+	var err error
+	m.connection, err = net.ListenPacket("udp", address)
 	if err != nil {
 		return err, nil
 	}
@@ -76,18 +82,7 @@ func (m *MotionReceiver) receive(address string, done chan struct{}) (error, cha
 
 	go func() {
 		for {
-			select {
-			case <-done:
-				conn.Close()
-				return
-			default:
-			}
-		}
-	}()
-
-	go func() {
-		for {
-			length, remoteAddr, err := conn.ReadFrom(buffer)
+			length, remoteAddr, err := m.connection.ReadFrom(buffer)
 			if err != nil {
 				// TODO: Ignore "use of closed network connection"
 				ch <- err

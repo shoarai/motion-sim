@@ -1,137 +1,150 @@
 package main
 
 import (
-	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
-	"net"
-	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 
-	"github.com/shoarai/washout"
-
-	"./receiver"
-
-	"github.com/alecthomas/template"
 	"github.com/shoarai/washout/jaxfilter"
+	"github.com/shoarai/washout/washloop"
+
+	"./internal/receiver"
+	"./internal/webserver"
 )
 
-type Position struct {
-	X      float64 `json:"x"`
-	Y      float64 `json:"y"`
-	Z      float64 `json:"z"`
-	AngleX float64 `json:"angleX"`
-	AngleY float64 `json:"angleY"`
-	AngleZ float64 `json:"angleZ"`
-}
-
-var motionReceiver = receiver.MotionReceiver{}
-
 func main() {
-	// ip := "127.0.0.1"
-	ip := "192.168.179.3"
-	port := 8885
+	ip := *flag.String("ip", "127.0.0.1", "IP Address")
+	port := *flag.Int("port", 8888, "Port number")
+	webAddress := *flag.String("web-address", ":8080", "Address for Web Server")
+	interval := *flag.Uint("interval", 10, "Inteval of washout")
+	flag.Parse()
 
-	address := ip + ":" + strconv.Itoa(port)
+	address := fmt.Sprintf("%s:%d", ip, port)
+	err := receiver.Listen(address)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(fmt.Sprintf("Listen motion from %q", address))
+
 	done := make(chan struct{})
-
-	err, errCh := motionReceiver.Listen(address, done)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	listener, ch, err := ListenAndServe()
-	if err != nil {
-		log.Fatal(err)
-	}
+	loop := createWashloop(interval)
 
 	go func() {
-		// os.Stdin.Read(make([]byte, 1)) // read a single byte
 		c := make(chan os.Signal, 1)
 		signal.Notify(c, os.Interrupt)
 		<-c
 
 		fmt.Println()
 		fmt.Println("exit...")
-		listener.Close()
+
+		webserver.Close()
+		receiver.Close()
+		loop.Stop()
 		close(done)
 	}()
 
-	<-ch
-	<-errCh
-	// log.Fatal(<-ch)
-	// log.Fatal(<-cherr)
-}
-
-func ListenAndServe() (net.Listener, chan error, error) {
-	ch := make(chan error)
-
-	listener, err := net.Listen("tcp", ":8080")
-	if err != nil {
-		return listener, nil, err
-	}
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", viewHandler)
-	mux.HandleFunc("/position", position)
-	mux.Handle("/js/", http.StripPrefix("/js/", http.FileServer(http.Dir("js"))))
+	go func() {
+		loop.Start()
+	}()
 
 	go func() {
-		ch <- http.Serve(listener, mux)
+		for {
+			data, err := receiver.Read()
+			if err != nil {
+				log.Fatal(err)
+			}
+			fmt.Println(data)
+
+			motion := toMotion(data)
+			loop.SetMotion(motion)
+		}
 	}()
-	return listener, ch, nil
+
+	webserver.ListenAndServe(webAddress, loop)
+	<-done
 }
 
-func startWebServer() {
-	http.HandleFunc("/", viewHandler) // ハンドラを登録してウェブページを表示させる
-	http.HandleFunc("/position", position)
-	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(http.Dir("js"))))
-	log.Fatal(http.ListenAndServe(":8080", nil))
+func createWashloop(interval uint) *washloop.WashoutLoop {
+	wash := jaxfilter.NewWashout(interval)
+	return washloop.NewWashoutLoop(wash, interval)
 }
 
-func handler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "index")
-}
-
-func position(w http.ResponseWriter, r *http.Request) {
-	motion := motionReceiver.GetMotion()
-
-	filter := jaxfilter.NewWashout(100)
-	position := filter.Filter(
-		motion.Acceleration.X,
-		motion.Acceleration.Y,
-		motion.Acceleration.Z,
-		motion.AngularVelocity.X,
-		motion.AngularVelocity.Y,
-		motion.AngularVelocity.Z,
-	)
-
-	response, err := json.Marshal(toPosition(position))
-	if err != nil {
-		panic(err)
+func toMotion(str string) washloop.Motion {
+	strings := strings.Split(str, ",")
+	if len(strings) != 6 {
+		panic("Invalid length of motion data")
 	}
-	// fmt.Fprintf(w, response)
-	w.Write(response)
-}
-
-func toPosition(pos washout.Position) Position {
-	return Position{
-		pos.X, pos.Y, pos.Z, pos.AngleX, pos.AngleY, pos.AngleZ,
-	}
-}
-
-func viewHandler(w http.ResponseWriter, r *http.Request) {
-	// page := Page{"Hello World.", 1}
-	tmpl, err := template.ParseFiles("index.html") // ParseFilesを使う
-	if err != nil {
-		panic(err)
+	var floats [6]float64
+	for i, v := range strings {
+		var err error
+		floats[i], err = strconv.ParseFloat(v, 64)
+		if err != nil {
+			panic("Invalid motion data to convert string to float64")
+		}
 	}
 
-	err = tmpl.Execute(w, nil)
-	// err = tmpl.Execute(w, page)
-	if err != nil {
-		panic(err)
+	motion := washloop.Motion{
+		Acceleration: washloop.Vector{
+			floats[0],
+			floats[1],
+			floats[2]},
+		AngularVelocity: washloop.Vector{
+			floats[3],
+			floats[4],
+			floats[5]},
 	}
+	return motion
 }
+
+// type Position struct {
+// 	X      float64 `json:"x"`
+// 	Y      float64 `json:"y"`
+// 	Z      float64 `json:"z"`
+// 	AngleX float64 `json:"angleX"`
+// 	AngleY float64 `json:"angleY"`
+// 	AngleZ float64 `json:"angleZ"`
+// }
+
+// var motionReceiver = receiver.MotionReceiver{}
+
+// func a() {
+// 	// ip := "127.0.0.1"
+// 	ip := "192.168.179.3"
+// 	port := 8884
+
+// 	address := ip + ":" + strconv.Itoa(port)
+// 	done := make(chan struct{})
+
+// 	err, errCh := motionReceiver.Listen(address, done)
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
+
+// 	loop := washloop.NewWashoutLoop(jaxfilter.NewWashout(10), 10)
+// 	ch, err := webserver.ListenAndServe(loop)
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
+
+// 	go func() {
+// 		// os.Stdin.Read(make([]byte, 1)) // read a single byte
+// 		c := make(chan os.Signal, 1)
+// 		signal.Notify(c, os.Interrupt)
+// 		<-c
+
+// 		fmt.Println()
+// 		fmt.Println("exit...")
+// 		motionReceiver.Close()
+// 		webserver.Close()
+// 		close(done)
+// 	}()
+
+// 	<-ch
+// 	<-errCh
+// 	// log.Fatal(<-ch)
+// 	// log.Fatal(<-cherr)
+// }

@@ -1,6 +1,0 @@
-// package httpserver
-
-
-// func ServiceUIFrameContext() {
-
-// }
