@@ -17,13 +17,13 @@ import (
 )
 
 func main() {
-	ip := *flag.String("ip", "127.0.0.1", "IP Address")
-	port := *flag.Int("port", 8888, "Port number")
-	webAddress := *flag.String("web-address", ":8080", "Address for Web Server")
-	interval := *flag.Uint("interval", 10, "Inteval of washout")
+	ip := flag.String("ip", "127.0.0.1", "IP Address")
+	port := flag.Int("port", 8888, "Port number")
+	webAddress := flag.String("web-address", ":8080", "Address for Web Server")
+	interval := flag.Uint("interval", 10, "Inteval of washout")
 	flag.Parse()
 
-	address := fmt.Sprintf("%s:%d", ip, port)
+	address := fmt.Sprintf("%s:%d", *ip, *port)
 	err := receiver.Listen(address)
 	if err != nil {
 		log.Fatal(err)
@@ -31,7 +31,7 @@ func main() {
 	fmt.Println(fmt.Sprintf("Listen motion from %q", address))
 
 	done := make(chan struct{})
-	loop := createWashloop(interval)
+	loop := createWashloop(*interval)
 
 	go func() {
 		c := make(chan os.Signal, 1)
@@ -64,7 +64,7 @@ func main() {
 		}
 	}()
 
-	webserver.ListenAndServe(webAddress, loop)
+	webserver.ListenAndServe(*webAddress, loop)
 	<-done
 }
 
