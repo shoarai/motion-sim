@@ -16,6 +16,7 @@ import (
 var loop *washloop.WashoutLoop
 var listener net.Listener
 
+// ListenAndServe listens and serve requests as web server.
 func ListenAndServe(address string, l *washloop.WashoutLoop) error {
 	loop = l
 	return listenAndServe(address)
@@ -36,6 +37,7 @@ func listenAndServe(address string) error {
 	return http.Serve(listener, mux)
 }
 
+// Close closes a listener of server
 func Close() {
 	if listener != nil {
 		listener.Close()
@@ -75,6 +77,11 @@ func position(w http.ResponseWriter, r *http.Request) {
 
 func toPosition(pos washout.Position) models.Position {
 	return models.Position{
-		pos.X, pos.Y, pos.Z, pos.AngleX, pos.AngleY, pos.AngleZ,
+		X:      pos.X,
+		Y:      pos.Y,
+		Z:      pos.Z,
+		AngleX: pos.AngleX,
+		AngleY: pos.AngleY,
+		AngleZ: pos.AngleZ,
 	}
 }

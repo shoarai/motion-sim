@@ -89,13 +89,13 @@ func toMotion(str string) washloop.Motion {
 
 	motion := washloop.Motion{
 		Acceleration: washloop.Vector{
-			floats[0],
-			floats[1],
-			floats[2]},
+			X: floats[0],
+			Y: floats[1],
+			Z: floats[2]},
 		AngularVelocity: washloop.Vector{
-			floats[3],
-			floats[4],
-			floats[5]},
+			X: floats[3],
+			Y: floats[4],
+			Z: floats[5]},
 	}
 	return motion
 }
