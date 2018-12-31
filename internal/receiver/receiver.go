@@ -6,24 +6,23 @@ import (
 
 var connection net.PacketConn
 
+// Listen listens an UDP connection.
 func Listen(address string) (err error) {
 	connection, err = net.ListenPacket("udp", address)
 	return
 }
 
+// Read reads data of a connection.
 func Read() (string, error) {
 	buffer := make([]byte, 1500)
 	length, _, err := connection.ReadFrom(buffer)
 	if err != nil {
 		return "", err
 	}
-	// fmt.Println(string(buffer[:length]))
-	// fmt.Printf("Received from %v: %v\n", remoteAddr, string(buffer[:length]))
-	// conn.WriteTo([]byte("Hello, World !"), remoteAddr)
-
 	return string(buffer[:length]), nil
 }
 
+// Close a connection.
 func Close() {
 	connection.Close()
 }

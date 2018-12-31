@@ -2,16 +2,23 @@ package webserver
 
 import (
 	"encoding/json"
-	"log"
 	"net"
 	"net/http"
 	"text/template"
 
-	"github.com/shoarai/washout/washloop"
-
-	"../../models"
 	"github.com/shoarai/washout"
+	"github.com/shoarai/washout/washloop"
 )
+
+// A Position is six degrees of freedom position.
+type Position struct {
+	X      float64 `json:"x"`
+	Y      float64 `json:"y"`
+	Z      float64 `json:"z"`
+	AngleX float64 `json:"angleX"`
+	AngleY float64 `json:"angleY"`
+	AngleZ float64 `json:"angleZ"`
+}
 
 var loop *washloop.WashoutLoop
 var listener net.Listener
@@ -44,22 +51,14 @@ func Close() {
 	}
 }
 
-func startWebServer() {
-	http.HandleFunc("/", index)
-	http.HandleFunc("/position", position)
-	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(http.Dir("js"))))
-	log.Fatal(http.ListenAndServe(":8080", nil))
-}
-
 func index(w http.ResponseWriter, r *http.Request) {
 	// page := Page{"Hello World.", 1}
-	tmpl, err := template.ParseFiles("index.html") // ParseFilesを使う
+	tmpl, err := template.ParseFiles("./index.html") // ParseFilesを使う
 	if err != nil {
 		panic(err)
 	}
 
 	err = tmpl.Execute(w, nil)
-	// err = tmpl.Execute(w, page)
 	if err != nil {
 		panic(err)
 	}
@@ -75,8 +74,8 @@ func position(w http.ResponseWriter, r *http.Request) {
 	w.Write(response)
 }
 
-func toPosition(pos washout.Position) models.Position {
-	return models.Position{
+func toPosition(pos washout.Position) Position {
+	return Position{
 		X:      pos.X,
 		Y:      pos.Y,
 		Z:      pos.Z,
