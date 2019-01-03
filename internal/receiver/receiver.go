@@ -22,7 +22,7 @@ func Read() (string, error) {
 	return string(buffer[:length]), nil
 }
 
-// Close a connection.
+// Close closes a connection.
 func Close() {
 	connection.Close()
 }

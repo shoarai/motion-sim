@@ -5,7 +5,9 @@ import (
 	"net"
 	"net/http"
 	"text/template"
+	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/shoarai/washout"
 	"github.com/shoarai/washout/washloop"
 )
@@ -38,7 +40,8 @@ func listenAndServe(address string) error {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", index)
-	mux.HandleFunc("/position", position)
+	// mux.HandleFunc("/position", position)
+	mux.HandleFunc("/ws", wsHandler)
 	mux.Handle("/js/", http.StripPrefix("/js/", http.FileServer(http.Dir("js"))))
 
 	return http.Serve(listener, mux)
@@ -51,8 +54,30 @@ func Close() {
 	}
 }
 
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+}
+
+func wsHandler(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil) // error ignored for sake of simplicity
+	if err != nil {
+		panic(err)
+	}
+
+	for {
+		writePosition(conn)
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+func writePosition(conn *websocket.Conn) {
+	position := loop.GetPosition()
+	pos := toPosition(position)
+	conn.WriteJSON(pos)
+}
+
 func index(w http.ResponseWriter, r *http.Request) {
-	// page := Page{"Hello World.", 1}
 	tmpl, err := template.ParseFiles("./index.html") // ParseFilesを使う
 	if err != nil {
 		panic(err)

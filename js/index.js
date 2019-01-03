@@ -54,17 +54,25 @@ function init() {
     requestAnimationFrame(tick);
   }
 
-  setInterval(() =>{
-    getPostion().then(position =>{
-      position = convertAxis(position)
-      position = scaleMotion(position)
-      box.position.set(position.x, position.y, position.z)
-      box.rotation.set(position.angleX,position.angleY,position.angleZ)
-    }).catch((error) => { 
-      console.error(`エラーが発生しました (${error})`);
-  });
-  }, 100)
+  var openWebSocket = () => {
+    var url = location.hostname + (location.port ? ':' + location.port : '');
+    var socket = new WebSocket(`ws://${url}/ws`);
+    socket.onopen = function () {
+      console.log("onopen")
+    };
+    socket.onmessage = function (e) {
+      updatePosition(JSON.parse(e.data))
+    };  
+  }
 
+  openWebSocket()
+
+  var updatePosition = (position) => {
+    pos = convertAxis(position)
+    pos = scaleMotion(pos)
+    box.position.set(pos.x, pos.y, pos.z)
+    box.rotation.set(pos.angleX,pos.angleY,pos.angleZ)
+  }
 
   var scaleMotion = (position) => {
     var scale = 1/2

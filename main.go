@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/shoarai/washout"
 	"github.com/shoarai/washout/jaxfilter"
 	"github.com/shoarai/washout/washloop"
 
@@ -70,7 +71,7 @@ func main() {
 
 func createWashloop(interval uint) *washloop.WashoutLoop {
 	wash := jaxfilter.NewWashout(interval)
-	return washloop.NewWashoutLoop(wash, interval)
+	return washloop.NewWashLoop(wash, interval)
 }
 
 func toMotion(str string) washloop.Motion {
@@ -88,11 +89,11 @@ func toMotion(str string) washloop.Motion {
 	}
 
 	motion := washloop.Motion{
-		Acceleration: washloop.Vector{
+		Acceleration: washout.Vector{
 			X: floats[0],
 			Y: floats[1],
 			Z: floats[2]},
-		AngularVelocity: washloop.Vector{
+		AngularVelocity: washout.Vector{
 			X: floats[3],
 			Y: floats[4],
 			Z: floats[5]},
